@@ -5,7 +5,7 @@ import logging
 import httpx
 from aiogram import Bot
 from config import Config
-from ton import TonClient, WalletV4R2, Address
+from pytonlib import TonlibClient
 
 def fix_base64_padding(b64_string: str) -> str:
     missing_padding = len(b64_string) % 4
@@ -28,14 +28,16 @@ class FragmentSender:
             "X-Requested-With": "XMLHttpRequest",
         }
         self.ton_client = None
-        logging.info("FragmentSender initialized (using 'ton' library)")
+        logging.info("FragmentSender initialized (pytonlib)")
 
     async def _init_ton_client(self):
         if self.ton_client is None:
-            self.ton_client = TonClient(
-                api_key=self.config.ton.api_ton,
-                network='mainnet'
+            self.ton_client = TonlibClient(
+                ls_index=0,
+                config='https://ton.org/global.config.json',
+                keystore='./keystore'
             )
+            await self.ton_client.init()
         return self.ton_client
 
     async def _safe_parse_response(self, response: httpx.Response):
@@ -57,34 +59,33 @@ class FragmentSender:
         try:
             client = await self._init_ton_client()
             mnemonic = self.config.ton.wallet_seed.split()
-            wallet = await WalletV4R2.from_mnemonic(client, mnemonic)
-            sender_address = wallet.address.to_string()
-            logging.info(f"[TON] Wallet address: {sender_address}")
+            wallet = await client.import_wallet(mnemonic, wallet_id=698983191)
+            address = wallet['address']
+            logging.info(f"[TON] Wallet address: {address}")
 
-            # Проверка баланса
-            balance = await client.get_balance(sender_address)
+            balance = await client.get_balance(address)
             amount_decimal = float(amount) / 1_000_000_000
             if balance < amount_decimal:
                 logging.critical(f"Insufficient funds. Required: {amount_decimal:.4f} TON")
                 return False
 
-            # Декодируем payload
             decoded_bytes = base64.b64decode(fix_base64_padding(payload))
             decoded_text = ''.join(chr(b) if 32 <= b < 127 else ' ' for b in decoded_bytes)
             clean_text = re.sub(r'\s+', ' ', decoded_text).strip()
             match = re.search(comment_template, clean_text)
             final_text = match.group(0) if match else clean_text
 
-            # Отправляем
-            tx_hash = await wallet.transfer(
-                destination=Address(recipient_addr),
+            result = await client.transfer(
+                destination=recipient_addr,
                 amount=amount_decimal,
-                body=final_text
+                comment=final_text,
+                wallet=wallet
             )
-            logging.info(f"Transaction sent: {tx_hash}")
+            logging.info(f"Transaction sent: {result}")
             return True
         except Exception as e:
             logging.error(f"TON transaction failed: {e}")
+            await self._notify_admins(f"❌ Ошибка TON: {str(e)}")
             return False
 
     async def send_stars(self, username: str, quantity: int) -> bool:
