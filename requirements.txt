@@ -5,7 +5,7 @@ httpx
 aiohttp
 apscheduler
 pytz
-tonutils
+ton
 requests
 beautifulsoup4
 lolzteam
