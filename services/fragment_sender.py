@@ -14,7 +14,7 @@ def fix_base64_padding(b64_string: str) -> str:
     return b64_string
 
 class FragmentSender:
-    def _init_(self, config: Config, bot: Bot):
+    def __init__(self, config: Config, bot: Bot):
         self.config = config
         self.bot = bot
         self.url = "https://fragment.com/api"
