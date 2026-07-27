@@ -5,8 +5,8 @@ from . import start, profile, calculator, purchase_stars, purchase_premium
 def get_user_router() -> Router:
     router = Router()
     
-    router.message.filter(CheckSubscriptionFilter())
-    router.callback_query.filter(CheckSubscriptionFilter())
+#    router.message.filter(CheckSubscriptionFilter())
+#    router.callback_query.filter(CheckSubscriptionFilter())
     
     router.include_router(start.router)
     router.include_router(profile.router)
