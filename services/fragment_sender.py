@@ -145,6 +145,7 @@ logging.info(f"STEL_TON_TOKEN: {self.config.ton.stel_ton_token}")
                     "id": req_id,
                     "show_sender": "0",
                     "method": "getBuyStarsLink"
+                    "currency": "TON"
                 }
                 response_step3 = await client.post(self.url, data=data_step3, headers=headers_step3)
                 response_step3.raise_for_status()
