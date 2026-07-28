@@ -27,6 +27,10 @@ class FragmentSender:
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
             "X-Requested-With": "XMLHttpRequest",
         }
+        logging.info(f"FRAGMENT_HASH: {self.config.fragment.hash}")
+logging.info(f"STEL_SSID: {self.config.ton.stel_ssid}")
+logging.info(f"STEL_TON_TOKEN: {self.config.ton.stel_ton_token}")
+
         self.ton_client = None
         logging.info("FragmentSender initialized (pytonlib)")
 
