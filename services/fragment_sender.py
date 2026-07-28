@@ -16,7 +16,7 @@ class FragmentSender:
     def __init__(self, config: Config, bot: Bot):
         self.config = config
         self.bot = bot
-        self.url = "https://fragment.com/api"
+        self.url = f"https://fragment.com/api?hash={self.config.fragment.hash}"
         self.base_headers = {
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
