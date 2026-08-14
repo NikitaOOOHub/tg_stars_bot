@@ -69,7 +69,6 @@ class FragmentSender:
                     "method": "initBuyStarsRequest",
                     "mode": "new",
                     "lv": "false",
-                    "dh": "1631136706",
                     "currency": "GRAM",
                     "payment_method": "gram"
                 }
@@ -103,7 +102,6 @@ class FragmentSender:
                     "method": "getBuyStarsLink",
                     "mode": "new",
                     "lv": "false",
-                    "dh": "1631136706",
                     "currency": "GRAM"
                 }
                 response_step3 = await client.post(self.url, data=data_step3, headers=headers_step3)
