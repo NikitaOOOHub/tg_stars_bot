@@ -1,131 +1,47 @@
-import base64
-import re
-import json
 import logging
-import httpx
 from aiogram import Bot
 from config import Config
-
-def fix_base64_padding(b64_string: str) -> str:
-    missing_padding = len(b64_string) % 4
-    if missing_padding:
-        b64_string += '=' * (4 - missing_padding)
-    return b64_string
+from fragment_api import FragmentAPI
 
 class FragmentSender:
-    def __init__(self, config: Config, bot: Bot):
+    def init(self, config: Config, bot: Bot):
         self.config = config
         self.bot = bot
-        self.url = f"https://fragment.com/api?hash={self.config.fragment.hash}"
-        self.base_headers = {
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Origin": "https://fragment.com",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-            "X-Requested-With": "XMLHttpRequest"
-        }
-        logging.info("FragmentSender initialized (updated API)")
-
-    async def _safe_parse_response(self, response: httpx.Response):
-        content = response.content
-        try:
-            return response.json()
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            for encoding in ['utf-8', 'windows-1251', 'latin-1', 'cp1252']:
-                try:
-                    text = content.decode(encoding)
-                    return json.loads(text)
-                except:
-                    continue
-            logging.error(f"Failed to parse response. Raw: {content[:200]}")
-            return None
+        self.api = FragmentAPI(
+            seed=self.config.ton.wallet_seed,           # мнемоника (24 слова)
+            api_key=self.config.ton.api_ton,            # API ключ TON
+            cookies=self.config.fragment.cookies,       # куки с Fragment
+            hash=self.config.fragment.hash              # хеш с Fragment
+        )
+        logging.info("FragmentSender initialized with fragment-api-py")
 
     async def send_stars(self, username: str, quantity: int) -> bool:
-        logging.info(f"Starting stars purchase: {quantity} stars for @{username}")
+        logging.info(f"Sending {quantity} stars to @{username}")
         try:
-            async with httpx.AsyncClient(cookies=self.config.fragment.cookies, headers=self.base_headers, timeout=30.0) as client:
-                headers_step1 = self.base_headers.copy()
-                headers_step1["Referer"] = "https://fragment.com/stars"
-                data_step1 = {"query": username, "method": "searchStarsRecipient"}
-                response_step1 = await client.post(self.url, data=data_step1, headers=headers_step1)
-                response_step1.raise_for_status()
-                json_step1 = await self._safe_parse_response(response_step1)
-                logging.info(f"Step1: {json_step1}")
-                if json_step1 is None or not json_step1.get("ok", True):
-                    logging.error("Step1 failed")
-                    return False
-                recipient = json_step1.get("found", {}).get("recipient")
-                if not recipient:
-                    logging.error("Step1: no recipient")
-                    return False
-
-                headers_step2 = self.base_headers.copy()
-                headers_step2["Referer"] = f"https://fragment.com/stars/buy?query={username}"
-                data_step2 = {
-                    "recipient": recipient,
-                    "quantity": quantity,
-                    "method": "initBuyStarsRequest",
-                    "mode": "new",
-                    "lv": "false",
-                    "currency": "GRAM",
-                    "payment_method": "gram"
-                }
-                response_step2 = await client.post(self.url, data=data_step2, headers=headers_step2)
-                response_step2.raise_for_status()
-                json_step2 = await self._safe_parse_response(response_step2)
-                logging.info(f"Step2: {json_step2}")
-                if json_step2 is None or not json_step2.get("ok", True):
-                    logging.error("Step2 failed")
-                    return False
-                req_id = json_step2.get("req_id")
-                if not req_id:
-                    logging.error("Step2: no req_id")
-                    return False
-
-                headers_step3 = self.base_headers.copy()
-                headers_step3["Referer"] = f"https://fragment.com/stars/buy?recipient={recipient}&quantity={quantity}"
-                data_step3 = {
-                    "address": self.config.fragment.address,
-                    "chain": "-239",
-                    "walletStateInit": self.config.fragment.wallets,
-                    "publicKey": self.config.fragment.public_key,
-                    "features": ["SendTransaction", {"name": "SendTransaction", "maxMessages": 255}],
-                    "maxProtocolVersion": 2,
-                    "platform": "iphone",
-                    "appName": "Tonkeeper",
-                    "appVersion": "5.0.14",
-                    "transaction": "1",
-                    "id": req_id,
-                    "show_sender": "0",
-                    "method": "getBuyStarsLink",
-                    "mode": "new",
-                    "lv": "false",
-                    "currency": "GRAM"
-                }
-                response_step3 = await client.post(self.url, data=data_step3, headers=headers_step3)
-                response_step3.raise_for_status()
-                json_step3 = await self._safe_parse_response(response_step3)
-                logging.info(f"Step3: {json_step3}")
-                if json_step3 is None or not (json_step3.get("ok") and "transaction" in json_step3):
-                    logging.error("Step3: no transaction")
-                    return False
-
-                logging.info("Stars purchase completed successfully")
-                return True
+            result = await self.api.buy_stars(username, quantity)
+            logging.info(f"Stars purchase completed: {result}")
+            await self._notify_admins(f"✅ Куплено {quantity} звёзд для @{username}")
+            return True
         except Exception as e:
             logging.error(f"Stars purchase failed: {e}")
+            await self._notify_admins(f"❌ Ошибка: {str(e)}")
+            return False
+
+    async def send_premium(self, username: str, months: int) -> bool:
+        logging.info(f"Sending {months} months Premium to @{username}")
+        try:
+            result = await self.api.buy_premium(username, months)
+            logging.info(f"Premium purchase completed: {result}")
+            await self._notify_admins(f"✅ Куплен Premium ({months} мес.) для @{username}")
+            return True
+        except Exception as e:
+            logging.error(f"Premium purchase failed: {e}")
             await self._notify_admins(f"❌ Ошибка: {str(e)}")
             return False
 
     async def _notify_admins(self, message: str):
         for admin_id in self.config.bot.admin_ids:
             try:
-                await self.bot.send_message(admin_id, f"🔗 <b>Fragment уведомление</b>\n\n{message}")
+                await self.bot.send_message(admin_id, f"🔔 {message}")
             except Exception as e:
                 logging.error(f"Failed to notify admin {admin_id}: {e}")
-
-    async def send_premium(self, username: str, months: int) -> bool:
-        logging.info(f"Premium purchase not implemented yet")
-        return False
