@@ -4,7 +4,7 @@ from config import Config
 from fragment_api import FragmentAPI
 
 class FragmentSender:
-    def init(self, config: Config, bot: Bot):
+    def __init__(self, config: Config, bot: Bot):
         self.config = config
         self.bot = bot
         self.api = FragmentAPI(
