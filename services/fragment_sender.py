@@ -1,24 +1,29 @@
 import logging
 from aiogram import Bot
 from config import Config
-from fragment_api import FragmentAPI
+from pyfragment import FragmentClient
+from pyfragment.enums import PaymentMethod
 
 class FragmentSender:
     def __init__(self, config: Config, bot: Bot):
         self.config = config
         self.bot = bot
-        self.api = FragmentAPI(
+        self.client = FragmentClient(
             seed=self.config.ton.wallet_seed,
             api_key=self.config.ton.api_ton,
             cookies=self.config.fragment.cookies,
             hash=self.config.fragment.hash
         )
-        logging.info("FragmentSender initialized with fragment-api-py")
+        logging.info("FragmentSender initialized with pyfragment")
 
     async def send_stars(self, username: str, quantity: int) -> bool:
         logging.info(f"Sending {quantity} stars to @{username}")
         try:
-            result = await self.api.buy_stars(username, quantity)
+            result = await self.client.purchase_stars(
+                username=username,
+                amount=quantity,
+                payment_method=PaymentMethod.GRAM  # или PaymentMethod.TON, если используешь TON
+            )
             logging.info(f"Stars purchase completed: {result}")
             await self._notify_admins(f"✅ Куплено {quantity} звёзд для @{username}")
             return True
@@ -30,7 +35,11 @@ class FragmentSender:
     async def send_premium(self, username: str, months: int) -> bool:
         logging.info(f"Sending {months} months Premium to @{username}")
         try:
-            result = await self.api.buy_premium(username, months)
+            result = await self.client.purchase_premium(
+                username=username,
+                months=months,
+                payment_method=PaymentMethod.GRAM
+            )
             logging.info(f"Premium purchase completed: {result}")
             await self._notify_admins(f"✅ Куплен Premium ({months} мес.) для @{username}")
             return True
