@@ -23,8 +23,8 @@ class FragmentSender:
             "Accept-Encoding": "gzip, deflate, br",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "Origin": "https://fragment.com",
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
-            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+            "X-Requested-With": "XMLHttpRequest"
         }
         logging.info("FragmentSender initialized (updated API)")
 
@@ -46,7 +46,6 @@ class FragmentSender:
         logging.info(f"Starting stars purchase: {quantity} stars for @{username}")
         try:
             async with httpx.AsyncClient(cookies=self.config.fragment.cookies, headers=self.base_headers, timeout=30.0) as client:
-                # Шаг 1: поиск получателя
                 headers_step1 = self.base_headers.copy()
                 headers_step1["Referer"] = "https://fragment.com/stars"
                 data_step1 = {"query": username, "method": "searchStarsRecipient"}
@@ -62,13 +61,17 @@ class FragmentSender:
                     logging.error("Step1: no recipient")
                     return False
 
-                # Шаг 2: инициализация покупки
                 headers_step2 = self.base_headers.copy()
                 headers_step2["Referer"] = f"https://fragment.com/stars/buy?query={username}"
                 data_step2 = {
                     "recipient": recipient,
                     "quantity": quantity,
-                    "method": "initBuyStarsRequest"
+                    "method": "initBuyStarsRequest",
+                    "mode": "new",
+                    "lv": "false",
+                    "dh": "1631136706",
+                    "currency": "GRAM",
+                    "payment_method": "gram"
                 }
                 response_step2 = await client.post(self.url, data=data_step2, headers=headers_step2)
                 response_step2.raise_for_status()
@@ -82,7 +85,6 @@ class FragmentSender:
                     logging.error("Step2: no req_id")
                     return False
 
-                # Шаг 3: получение ссылки на транзакцию (с новыми параметрами)
                 headers_step3 = self.base_headers.copy()
                 headers_step3["Referer"] = f"https://fragment.com/stars/buy?recipient={recipient}&quantity={quantity}"
                 data_step3 = {
@@ -102,7 +104,7 @@ class FragmentSender:
                     "mode": "new",
                     "lv": "false",
                     "dh": "1631136706",
-                    "currency": "TON"
+                    "currency": "GRAM"
                 }
                 response_step3 = await client.post(self.url, data=data_step3, headers=headers_step3)
                 response_step3.raise_for_status()
@@ -112,7 +114,7 @@ class FragmentSender:
                     logging.error("Step3: no transaction")
                     return False
 
-                logging.info("Stars purchase completed successfully (simulated)")
+                logging.info("Stars purchase completed successfully")
                 return True
         except Exception as e:
             logging.error(f"Stars purchase failed: {e}")
